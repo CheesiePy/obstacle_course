@@ -7,20 +7,34 @@
 #include "trainee.h"
 #include "simulation.h"
 
-/**
- * @brief Prints the results for a single trainee.
- * @param trainee The trainee whose results are to be printed.
- */
-void print_trainee_results(Trainee* trainee) {
-    // This is a placeholder for the detailed printing logic.
-    // In the full implementation, you would iterate through the trainee's
-    // stats struct and print times for each obstacle as per the example output.
+void print_trainee_results(Trainee* trainee, Course* course, int num_obstacle_types) {
     printf("%s results:\n", trainee->name);
-    printf("  exit: %lld elapsed: %lld active: %lld wait: %lld\n\n",
-           trainee->stats.total_elapsed_time,
+    printf("enter: %lld\n", trainee->stats.enter_time);
+
+    for (int i = 0; i < num_obstacle_types; i++) {
+        int type_idx = trainee->stats.obstacle_type_indices[i];
+        int inst_idx = trainee->stats.obstacle_instance_indices[i];
+        printf("  %d. %s obs: %d start: %lld finish: %lld duration: %lld\n",
+               i,
+               course->obstacle_types[type_idx].name,
+               inst_idx,
+               trainee->stats.obstacle_start_times[i],
+               trainee->stats.obstacle_finish_times[i],
+               trainee->stats.obstacle_durations[i]);
+    }
+
+    printf("exit: %lld elapsed: %lld active: %lld wait: %lld\n\n",
+           trainee->stats.exit_time,
            trainee->stats.total_elapsed_time,
            trainee->stats.total_active_time,
            trainee->stats.total_wait_time);
+
+    // Free the dynamically allocated stat arrays
+    free(trainee->stats.obstacle_start_times);
+    free(trainee->stats.obstacle_finish_times);
+    free(trainee->stats.obstacle_durations);
+    free(trainee->stats.obstacle_type_indices);
+    free(trainee->stats.obstacle_instance_indices);
 }
 
 
@@ -74,7 +88,7 @@ int main(int argc, char* argv[]) {
         // Wait for each thread to finish its execution
         pthread_join(threads[i], NULL);
         // After a thread joins, its results are ready for reporting
-        print_trainee_results(&trainees[i]);
+        print_trainee_results(&trainees[i], course, course->num_obstacle_types);
     }
 
     // --- Cleanup ---
