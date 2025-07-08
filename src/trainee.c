@@ -129,7 +129,8 @@ void* trainee_run(void* arg) {
 
                     pthread_mutex_unlock(&course->obstacle_types[i].instances[j].lock);
 
-                    wake_up_all_waiters();
+                    // Wake up the next waiter in the queue.
+                    wake_up_next_waiter();
                     goto next_round;
                 }
             }
@@ -142,7 +143,10 @@ void* trainee_run(void* arg) {
             long long wait_start, wait_end;
             gettimeofday(&tv, NULL);
             wait_start = (long long)tv.tv_sec * 1000 + tv.tv_usec / 1000;
-            add_to_waiting_list(trainee);
+            
+            // Add trainee to the end of the queue
+            enqueue_waiter(trainee);
+            
             sem_wait(&trainee->personal_sem);
             gettimeofday(&tv, NULL);
             wait_end = (long long)tv.tv_sec * 1000 + tv.tv_usec / 1000;

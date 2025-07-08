@@ -2,83 +2,90 @@
 #include <stdlib.h>
 #include "simulation.h"
 
-// --- Global Variable Definitions ---
-
-// Mutex to protect the waiting list
-pthread_mutex_t waiting_list_mutex;
-
-// Head of the linked list for waiting trainees
-WaitingNode* waiting_list_head = NULL;
-
-
-// --- Function Implementations ---
+// --- Global Variable Definition ---
+WaitingQueue waiting_queue;
 
 /**
  * @brief Initializes the simulation's shared resources.
  */
 void init_simulation() {
-    if (pthread_mutex_init(&waiting_list_mutex, NULL) != 0) {
-        perror("Failed to initialize waiting list mutex");
+    waiting_queue.head = NULL;
+    waiting_queue.tail = NULL;
+    if (pthread_mutex_init(&waiting_queue.lock, NULL) != 0) {
+        perror("Failed to initialize waiting queue mutex");
         exit(EXIT_FAILURE);
     }
 }
 
 /**
- * @brief Adds a trainee to the shared waiting list.
+ * @brief Adds a trainee to the end of the waiting queue (FIFO).
  */
-void add_to_waiting_list(Trainee* trainee) {
-    // Lock the mutex to ensure exclusive access to the list
-    pthread_mutex_lock(&waiting_list_mutex);
-
-    // Create a new node
+void enqueue_waiter(Trainee* trainee) {
+    // Allocate a new node for the trainee
     WaitingNode* newNode = (WaitingNode*)malloc(sizeof(WaitingNode));
     if (!newNode) {
         perror("Failed to allocate memory for waiting list node");
-        pthread_mutex_unlock(&waiting_list_mutex); // Unlock before exiting
-        return;
+        return; // In a real-world scenario, you might want more robust error handling
     }
     newNode->trainee = trainee;
-    newNode->next = waiting_list_head; // Add to the front of the list
-    waiting_list_head = newNode;
+    newNode->next = NULL;
 
-    // Unlock the mutex
-    pthread_mutex_unlock(&waiting_list_mutex);
+    // Lock the queue for exclusive access
+    pthread_mutex_lock(&waiting_queue.lock);
+
+    // Add the new node to the tail of the queue
+    if (waiting_queue.tail == NULL) { // If the queue is empty
+        waiting_queue.head = newNode;
+        waiting_queue.tail = newNode;
+    } else {
+        waiting_queue.tail->next = newNode;
+        waiting_queue.tail = newNode;
+    }
+
+    // Unlock the queue
+    pthread_mutex_unlock(&waiting_queue.lock);
 }
 
 /**
- * @brief Wakes up all trainees on the waiting list.
+ * @brief Wakes up the next trainee in the queue.
  */
-void wake_up_all_waiters() {
-    // Lock the mutex for exclusive access
-    pthread_mutex_lock(&waiting_list_mutex);
+void wake_up_next_waiter() {
+    // Lock the queue for exclusive access
+    pthread_mutex_lock(&waiting_queue.lock);
 
-    WaitingNode* current = waiting_list_head;
-    while (current != NULL) {
-        // Signal the trainee's personal semaphore to wake them up
-        sem_post(&current->trainee->personal_sem);
-        current = current->next;
+    // Check if there is anyone to wake up
+    if (waiting_queue.head == NULL) {
+        pthread_mutex_unlock(&waiting_queue.lock);
+        return;
     }
 
-    // Free the entire list after waking everyone up
-    while (waiting_list_head != NULL) {
-        WaitingNode* temp = waiting_list_head;
-        waiting_list_head = waiting_list_head->next;
-        free(temp);
+    // Dequeue the trainee at the head of the list
+    WaitingNode* node_to_wake = waiting_queue.head;
+    waiting_queue.head = waiting_queue.head->next;
+    if (waiting_queue.head == NULL) { // If the queue is now empty
+        waiting_queue.tail = NULL;
     }
 
-    // Unlock the mutex
-    pthread_mutex_unlock(&waiting_list_mutex);
+    // Unlock the queue
+    pthread_mutex_unlock(&waiting_queue.lock);
+
+    // Signal the trainee's personal semaphore to wake them up
+    sem_post(&node_to_wake->trainee->personal_sem);
+    free(node_to_wake); // Free the memory for the dequeued node
 }
+
 
 /**
  * @brief Cleans up and destroys the simulation's shared resources.
  */
 void destroy_simulation() {
-    // There should be no waiters at the end, but clean up just in case
-    while (waiting_list_head != NULL) {
-        WaitingNode* temp = waiting_list_head;
-        waiting_list_head = waiting_list_head->next;
+    // Free any remaining nodes in the list
+    WaitingNode* current = waiting_queue.head;
+    while (current != NULL) {
+        WaitingNode* temp = current;
+        current = current->next;
         free(temp);
     }
-    pthread_mutex_destroy(&waiting_list_mutex);
+    // Destroy the mutex
+    pthread_mutex_destroy(&waiting_queue.lock);
 }

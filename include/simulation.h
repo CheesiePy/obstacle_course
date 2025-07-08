@@ -7,62 +7,52 @@
 /**
  * @struct WaitingNode
  * @brief A node in a linked list for trainees who are waiting.
- *
- * [cite_start]This structure creates a linked list to manage trainees who are waiting for an obstacle to become free[cite: 31].
  */
 typedef struct WaitingNode {
     Trainee* trainee;
     struct WaitingNode* next;
 } WaitingNode;
 
-// --- Global Shared Variables ---
-
 /**
- * @var waiting_list_mutex
- * @brief A mutex to ensure atomic access to the waiting list.
+ * @struct WaitingQueue
+ * @brief A FIFO queue to manage waiting trainees efficiently.
  *
- * This lock is essential to prevent race conditions when multiple trainees
- * [cite_start]try to add or remove themselves from the waiting list simultaneously[cite: 38, 55].
+ * This structure holds the head and tail of the waiting list and
+ * is protected by a single mutex to prevent race conditions.
  */
-extern pthread_mutex_t waiting_list_mutex;
+typedef struct {
+    WaitingNode* head;
+    WaitingNode* tail;
+    pthread_mutex_t lock;
+} WaitingQueue;
 
-/**
- * @var waiting_list_head
- * @brief A pointer to the head of the linked list of waiting trainees.
- */
-extern WaitingNode* waiting_list_head;
+// --- Global Shared Variable ---
+extern WaitingQueue waiting_queue;
 
 
 // --- Function Prototypes ---
 
 /**
  * @brief Initializes the simulation's shared resources.
- *
- * This function must be called once at the start of the program to
- * initialize the waiting list mutex.
  */
 void init_simulation();
 
 /**
- * @brief Adds a trainee to the shared waiting list in a thread-safe manner.
+ * @brief Adds a trainee to the end of the shared waiting queue.
  * @param trainee A pointer to the trainee who needs to wait.
  */
-void add_to_waiting_list(Trainee* trainee);
+void enqueue_waiter(Trainee* trainee);
 
 /**
- * @brief Wakes up all trainees currently on the waiting list.
+ * @brief Wakes up the next trainee at the front of the queue.
  *
- * [cite_start]A trainee who frees an obstacle calls this function[cite: 32]. It iterates through
- * the list, signals each trainee's personal semaphore to wake them up,
- * [cite_start]and then clears the list[cite: 32, 34].
+ * This function is called by a trainee who has just freed an obstacle.
+ * It wakes up only one trainee to avoid the "thundering herd" problem.
  */
-void wake_up_all_waiters();
+void wake_up_next_waiter();
 
 /**
  * @brief Cleans up and destroys the simulation's shared resources.
- *
- * This function should be called at the end of the program to destroy
- * the mutex and free any remaining memory associated with the waiting list.
  */
 void destroy_simulation();
 
