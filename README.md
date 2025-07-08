@@ -1,4 +1,3 @@
-````markdown
 # Obstacle Course Simulation
 
 This project is a **multi-threaded C simulation** of trainees navigating an obstacle course. It demonstrates the use of POSIX threads (`pthreads`), mutexes, and semaphores to coordinate concurrent access to shared resources. The simulation is highly configurable, allowing a variety of course layouts and trainee skill levels.
