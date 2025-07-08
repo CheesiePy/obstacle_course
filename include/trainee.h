@@ -40,7 +40,7 @@ typedef struct {
 typedef struct {
     Trainee* trainee;
     Course* course;
-} TraineeThreadArgs; // <-- The semicolon was missing here.
+} TraineeThreadArgs; // <-- FIXED: Added missing semicolon
 
 // --- Function Prototypes ---
 

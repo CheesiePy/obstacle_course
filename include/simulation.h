@@ -44,12 +44,13 @@ void init_simulation();
 void enqueue_waiter(Trainee* trainee);
 
 /**
- * @brief Wakes up the next trainee at the front of the queue.
+ * @brief Wakes up all trainees currently in the waiting queue.
  *
  * This function is called by a trainee who has just freed an obstacle.
- * It wakes up only one trainee to avoid the "thundering herd" problem.
+ * It wakes up all trainees to let them re-evaluate obstacle availability,
+ * as required by the simulation specification.
  */
-void wake_up_next_waiter();
+void wake_up_all_waiters();
 
 /**
  * @brief Cleans up and destroys the simulation's shared resources.

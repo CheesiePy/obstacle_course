@@ -25,7 +25,7 @@ void enqueue_waiter(Trainee* trainee) {
     WaitingNode* newNode = (WaitingNode*)malloc(sizeof(WaitingNode));
     if (!newNode) {
         perror("Failed to allocate memory for waiting list node");
-        return; // In a real-world scenario, you might want more robust error handling
+        return;
     }
     newNode->trainee = trainee;
     newNode->next = NULL;
@@ -47,31 +47,28 @@ void enqueue_waiter(Trainee* trainee) {
 }
 
 /**
- * @brief Wakes up the next trainee in the queue.
+ * @brief Wakes up all trainees in the queue using a safer pattern.
  */
-void wake_up_next_waiter() {
-    // Lock the queue for exclusive access
+void wake_up_all_waiters() {
     pthread_mutex_lock(&waiting_queue.lock);
 
-    // Check if there is anyone to wake up
-    if (waiting_queue.head == NULL) {
-        pthread_mutex_unlock(&waiting_queue.lock);
-        return;
-    }
+    // Move the entire list of waiters to a temporary list.
+    WaitingNode* head_to_wake = waiting_queue.head;
 
-    // Dequeue the trainee at the head of the list
-    WaitingNode* node_to_wake = waiting_queue.head;
-    waiting_queue.head = waiting_queue.head->next;
-    if (waiting_queue.head == NULL) { // If the queue is now empty
-        waiting_queue.tail = NULL;
-    }
-
-    // Unlock the queue
+    // Reset the main queue, making it available for new waiters immediately.
+    waiting_queue.head = NULL;
+    waiting_queue.tail = NULL;
+    
     pthread_mutex_unlock(&waiting_queue.lock);
 
-    // Signal the trainee's personal semaphore to wake them up
-    sem_post(&node_to_wake->trainee->personal_sem);
-    free(node_to_wake); // Free the memory for the dequeued node
+    // Now, wake up the trainees from the temporary list.
+    // This avoids holding the lock while signaling, which is safer.
+    while (head_to_wake != NULL) {
+        sem_post(&head_to_wake->trainee->personal_sem);
+        WaitingNode* to_free = head_to_wake;
+        head_to_wake = head_to_wake->next;
+        free(to_free);
+    }
 }
 
 

@@ -3,16 +3,16 @@
 
 #include <pthread.h>
 
-// Represents one physical station, e.g., "rope 2" [cite: 17]
+// Represents one physical station, e.g., "rope 2"
 typedef struct {
     pthread_mutex_t lock;
 } ObstacleInstance;
 
-// Represents a category of obstacles, e.g., "rope" [cite: 13]
+// Represents a category of obstacles, e.g., "rope"
 typedef struct {
     char* name;
-    int count; // Number of instances [cite: 102]
-    int average_time_ms; // Average time to cross [cite: 103]
+    int count; // Number of instances
+    int average_time_ms; // Average time to cross
     ObstacleInstance* instances; // Array of the actual obstacles
 } ObstacleType;
 
@@ -22,8 +22,8 @@ typedef struct {
     ObstacleType* obstacle_types;
 } Course;
 
-// Add these declarations to match the implementations in src/course.c
+// --- Function Prototypes ---
 Course* load_course_from_file(const char* filename);
 void cleanup_course(Course* course);
 
-#endif
+#endif // COURSE_H

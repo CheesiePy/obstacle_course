@@ -9,6 +9,16 @@
 #include "simulation.h"
 
 /**
+ * @brief Gets the current time in milliseconds.
+ * @return The current time in milliseconds.
+ */
+static inline long long get_time_ms() {
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    return (long long)tv.tv_sec * 1000 + tv.tv_usec / 1000;
+}
+
+/**
  * @brief Loads trainee data from the specified file.
  */
 Trainee* load_trainees_from_file(const char* filename, int* num_trainees) {
@@ -76,10 +86,7 @@ void* trainee_run(void* arg) {
     trainee->stats.obstacle_instance_indices = calloc(num_obstacle_types, sizeof(int));
 
     // Record enter time
-    struct timeval tv;
-    gettimeofday(&tv, NULL);
-    long long sim_start = (long long)tv.tv_sec * 1000 + tv.tv_usec / 1000;
-    trainee->stats.enter_time = sim_start;
+    trainee->stats.enter_time = get_time_ms();
 
     // Array to track which obstacle types have been completed
     int* completed = calloc(num_obstacle_types, sizeof(int));
@@ -107,30 +114,28 @@ void* trainee_run(void* arg) {
                     types_completed_count++;
 
                     // Record start time
-                    gettimeofday(&tv, NULL);
-                    long long start_time = (long long)tv.tv_sec * 1000 + tv.tv_usec / 1000;
+                    long long start_time = get_time_ms();
                     trainee->stats.obstacle_start_times[obstacle_idx] = start_time;
 
                     // Calculate time to cross
                     float base_time = course->obstacle_types[i].average_time_ms;
                     float skill_factor = 1.0 - (trainee->skill_modifier / 100.0);
-                    float random_factor = 1.0 + ((rand() % 21 - 10) / 100.0); // -10% to +10%
+                    float random_factor = 1.0 + ((rand() % 21 - 10) / 100.0);
                     long sleep_duration_ms = base_time * skill_factor * random_factor;
 
                     // Simulate the time it takes to cross the obstacle
                     usleep(sleep_duration_ms * 1000); // usleep takes microseconds
 
                     // Record finish time and duration
-                    gettimeofday(&tv, NULL);
-                    long long finish_time = (long long)tv.tv_sec * 1000 + tv.tv_usec / 1000;
+                    long long finish_time = get_time_ms();
                     trainee->stats.obstacle_finish_times[obstacle_idx] = finish_time;
                     trainee->stats.obstacle_durations[obstacle_idx] = finish_time - start_time;
                     total_active += finish_time - start_time;
 
                     pthread_mutex_unlock(&course->obstacle_types[i].instances[j].lock);
 
-                    // Wake up the next waiter in the queue.
-                    wake_up_next_waiter();
+                    // An obstacle is free, so wake up all waiting trainees.
+                    wake_up_all_waiters();
                     goto next_round;
                 }
             }
@@ -139,26 +144,22 @@ void* trainee_run(void* arg) {
     next_round:
         // --- FAILURE: NO OBSTACLE FOUND ---
         if (!found_obstacle) {
-            // Add self to the waiting list and go to sleep ("נבצרות")
-            long long wait_start, wait_end;
-            gettimeofday(&tv, NULL);
-            wait_start = (long long)tv.tv_sec * 1000 + tv.tv_usec / 1000;
+            // Record the time we start waiting.
+            long long wait_start = get_time_ms();
             
-            // Add trainee to the end of the queue
+            // Add self to the waiting queue and wait to be woken up.
             enqueue_waiter(trainee);
-            
             sem_wait(&trainee->personal_sem);
-            gettimeofday(&tv, NULL);
-            wait_end = (long long)tv.tv_sec * 1000 + tv.tv_usec / 1000;
+            
+            // Record how long we waited.
+            long long wait_end = get_time_ms();
             total_wait += wait_end - wait_start;
         }
     }
 
     // --- CLEANUP ---
-    gettimeofday(&tv, NULL);
-    long long sim_end = (long long)tv.tv_sec * 1000 + tv.tv_usec / 1000;
-    trainee->stats.exit_time = sim_end;
-    trainee->stats.total_elapsed_time = sim_end - trainee->stats.enter_time;
+    trainee->stats.exit_time = get_time_ms();
+    trainee->stats.total_elapsed_time = trainee->stats.exit_time - trainee->stats.enter_time;
     trainee->stats.total_active_time = total_active;
     trainee->stats.total_wait_time = total_wait;
     free(completed);
