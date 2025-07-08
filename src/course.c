@@ -1,7 +1,7 @@
 #define _GNU_SOURCE // For strdup
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
+#include <string.h> // <--- Missing header added here
 #include "course.h"
 
 /**
